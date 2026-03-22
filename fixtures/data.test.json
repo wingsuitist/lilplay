@@ -1,0 +1,43 @@
+{
+  "site_token": "testtoken",
+  "parent_pin": "9999",
+  "daily_limit_seconds": 3600,
+  "music_dir": "./fixtures",
+  "timezone": "Europe/Zurich",
+  "session_secret": "testsecretkey12345678901234567890",
+  "children": [
+    {
+      "id": "child_1",
+      "name": "Emma",
+      "pin": "1111",
+      "daily_limit_seconds": 3600
+    },
+    {
+      "id": "child_2",
+      "name": "Sophie",
+      "pin": "2222",
+      "daily_limit_seconds": 3600
+    },
+    {
+      "id": "test",
+      "name": "Test",
+      "pin": "0000",
+      "daily_limit_seconds": 7200
+    }
+  ],
+  "usage": {
+    "child_1": {
+      "2026-03-22": 1903.9652768060585
+    },
+    "test": {
+      "2026-03-22": 0
+    }
+  },
+  "playback": {
+    "child_1": {
+      "file": "test.mp3",
+      "position": 5,
+      "folder": ""
+    }
+  }
+}

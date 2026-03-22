@@ -1,0 +1,23 @@
+services:
+  lil-play:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - DATA_PATH=/data/data.json
+      - PORT=8080
+    restart: unless-stopped
+
+  test:
+    image: denoland/deno:2.3.3
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      deno test
+      --allow-net --allow-read --allow-write --allow-env --allow-run
+      tests/store.test.ts tests/meta.test.ts tests/auth.test.ts tests/stream.test.ts tests/api.test.ts
+    profiles:
+      - test

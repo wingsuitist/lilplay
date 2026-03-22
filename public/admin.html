@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#135c6c" />
+  <title>lil-play Admin</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <style>
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-width: 260px; margin: 0 auto; }
+    .keypad button { aspect-ratio: 1; font-size: 1.4rem; font-weight: 600; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; }
+    .pin-display { font-size: 1.8rem; letter-spacing: 0.4rem; text-align: center; min-height: 2.2rem; margin-bottom: 0.75rem; }
+    .pin-dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--pico-primary); margin: 0 0.2rem; }
+    .pin-dot.empty { background: var(--pico-muted-border-color); }
+    .child-card { border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .usage-bar { height: 8px; border-radius: 4px; background: var(--pico-muted-border-color); overflow: hidden; margin: 0.25rem 0; }
+    .usage-fill { height: 100%; border-radius: 4px; background: var(--pico-primary); }
+    .week-chart { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin: 0.5rem 0; }
+    .week-bar { flex: 1; background: var(--pico-primary); border-radius: 2px 2px 0 0; min-height: 2px; opacity: 0.7; }
+    .week-bar.today { opacity: 1; }
+    .week-labels { display: flex; gap: 3px; font-size: 0.6rem; color: var(--pico-muted-color); }
+    .week-labels span { flex: 1; text-align: center; }
+    .actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .actions button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+    dialog article { max-width: 400px; }
+  </style>
+</head>
+<body>
+  <main class="container" x-data="admin()" x-init="init()">
+
+    <!-- PIN Screen -->
+    <div x-show="screen === 'pin'">
+      <hgroup style="text-align:center; margin-top:2rem;">
+        <h2>Admin Dashboard</h2>
+        <p>Enter parent PIN</p>
+      </hgroup>
+
+      <div class="pin-display">
+        <template x-for="i in 6" :key="i">
+          <span class="pin-dot" :class="{ empty: i > pin.length }"></span>
+        </template>
+      </div>
+      <p x-show="pinError" role="alert" style="color:var(--pico-del-color);text-align:center;" x-text="pinError"></p>
+      <div class="keypad">
+        <template x-for="d in [1,2,3,4,5,6,7,8,9]" :key="d">
+          <button @click="appendPin(String(d))" x-text="d" :disabled="loading"></button>
+        </template>
+        <button @click="clearPin()" aria-label="Delete digit">✕</button>
+        <button @click="appendPin('0')" :disabled="loading">0</button>
+        <button @click="submitPin()" aria-label="Confirm PIN" :disabled="loading || pin.length < 4">✓</button>
+      </div>
+    </div>
+
+    <!-- Dashboard Screen -->
+    <div x-show="screen === 'dashboard'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h2 style="margin:0;">Admin Dashboard</h2>
+        <button class="outline" style="padding:0.3rem 0.8rem;" @click="logout()">Sign out</button>
+      </div>
+
+      <template x-for="child in children" :key="child.id">
+        <div class="child-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong x-text="child.name"></strong>
+            <span style="font-size:0.85rem;color:var(--pico-muted-color);">
+              <span x-text="formatTime(child.today.used)"></span> / <span x-text="formatTime(child.today.limit)"></span>
+            </span>
+          </div>
+          <div class="usage-bar">
+            <div class="usage-fill" :style="`width:${child.today.limit > 0 ? Math.min(100, child.today.used / child.today.limit * 100) : 0}%`"></div>
+          </div>
+
+          <!-- 7-day chart -->
+          <div class="week-chart">
+            <template x-for="(val, key) in child.week" :key="key">
+              <div class="week-bar" :class="{ today: key === todayKey }"
+                   :style="`height:${child.today.limit > 0 ? Math.min(100, val / child.today.limit * 100) : 0}%`"
+                   :title="`${key}: ${formatTime(val)}`"></div>
+            </template>
+          </div>
+          <div class="week-labels">
+            <template x-for="(val, key) in child.week" :key="key">
+              <span x-text="key.slice(5)"></span>
+            </template>
+          </div>
+
+          <div class="actions">
+            <button class="secondary outline" @click="editChild(child)">Edit</button>
+            <button class="secondary outline" @click="resetQuota(child.id)">Reset quota</button>
+            <button class="contrast outline" @click="deleteChild(child)">Delete</button>
+          </div>
+        </div>
+      </template>
+
+      <button @click="openAddChild()" style="width:100%;margin-top:0.5rem;">+ Add child</button>
+
+      <!-- Edit/Add dialog -->
+      <dialog :open="showDialog" @click.self="showDialog=false">
+        <article>
+          <h3 x-text="editingChild ? 'Edit child' : 'Add child'"></h3>
+          <label>
+            Name
+            <input type="text" x-model="form.name" placeholder="Child's name" />
+          </label>
+          <label>
+            PIN (4–6 digits)
+            <input type="text" x-model="form.pin" placeholder="e.g. 1234" maxlength="6" inputmode="numeric" />
+          </label>
+          <label>
+            Daily limit (minutes)
+            <input type="number" x-model.number="form.limit_minutes" min="1" max="1440" />
+          </label>
+          <p x-show="formError" style="color:var(--pico-del-color);" x-text="formError"></p>
+          <footer style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button class="secondary outline" @click="showDialog=false">Cancel</button>
+            <button @click="saveChild()" :disabled="loading">Save</button>
+          </footer>
+        </article>
+      </dialog>
+
+      <!-- Confirm delete dialog -->
+      <dialog :open="showDeleteDialog" @click.self="showDeleteDialog=false">
+        <article>
+          <h3>Delete <span x-text="deleteTarget?.name"></span>?</h3>
+          <p>This will remove the child and all usage data.</p>
+          <footer style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button class="secondary outline" @click="showDeleteDialog=false">Cancel</button>
+            <button class="contrast" @click="confirmDelete()" :disabled="loading">Delete</button>
+          </footer>
+        </article>
+      </dialog>
+    </div>
+
+  </main>
+
+  <script>
+    function admin() {
+      return {
+        screen: 'pin',
+        pin: '',
+        pinError: '',
+        loading: false,
+        children: [],
+        todayKey: '',
+        showDialog: false,
+        showDeleteDialog: false,
+        editingChild: null,
+        deleteTarget: null,
+        form: { name: '', pin: '', limit_minutes: 60 },
+        formError: '',
+
+        async init() {
+          this.todayKey = new Date().toLocaleDateString('en-CA');
+          try {
+            const res = await fetch('/admin/api/stats');
+            if (res.ok) {
+              const data = await res.json();
+              this.children = data.children;
+              this.screen = 'dashboard';
+            }
+          } catch {}
+        },
+
+        appendPin(d) {
+          if (this.pin.length >= 6) return;
+          this.pin += d;
+          this.pinError = '';
+        },
+
+        clearPin() {
+          this.pin = this.pin.slice(0, -1);
+        },
+
+        async submitPin() {
+          if (this.pin.length < 4 || this.loading) return;
+          this.loading = true;
+          this.pinError = '';
+          try {
+            const res = await fetch('/admin/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pin: this.pin }),
+            });
+            if (res.ok) {
+              this.pin = '';
+              await this.loadStats();
+              this.screen = 'dashboard';
+            } else {
+              this.pinError = 'Wrong PIN';
+              this.pin = '';
+            }
+          } catch {
+            this.pinError = 'Connection error';
+          }
+          this.loading = false;
+        },
+
+        async loadStats() {
+          const res = await fetch('/admin/api/stats');
+          if (res.ok) {
+            const data = await res.json();
+            this.children = data.children;
+          }
+        },
+
+        async logout() {
+          await fetch('/admin/logout', { method: 'POST' });
+          this.screen = 'pin';
+          this.pin = '';
+          this.children = [];
+        },
+
+        openAddChild() {
+          this.editingChild = null;
+          this.form = { name: '', pin: '', limit_minutes: 60 };
+          this.formError = '';
+          this.showDialog = true;
+        },
+
+        editChild(child) {
+          this.editingChild = child;
+          this.form = {
+            name: child.name,
+            pin: '',
+            limit_minutes: Math.round(child.daily_limit_seconds / 60),
+          };
+          this.formError = '';
+          this.showDialog = true;
+        },
+
+        async saveChild() {
+          this.formError = '';
+          if (!this.form.name.trim()) { this.formError = 'Name is required'; return; }
+          if (this.form.pin && !/^\d{4,6}$/.test(this.form.pin)) { this.formError = 'PIN must be 4–6 digits'; return; }
+          if (!this.editingChild && !this.form.pin) { this.formError = 'PIN is required'; return; }
+
+          this.loading = true;
+          const body = {
+            name: this.form.name.trim(),
+            pin: this.form.pin || (this.editingChild?.pin ?? ''),
+            daily_limit_seconds: this.form.limit_minutes * 60,
+          };
+          if (this.editingChild) body.id = this.editingChild.id;
+
+          try {
+            const res = await fetch('/admin/api/child', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (res.ok) {
+              this.showDialog = false;
+              await this.loadStats();
+            } else {
+              this.formError = data.error || 'Save failed';
+            }
+          } catch {
+            this.formError = 'Connection error';
+          }
+          this.loading = false;
+        },
+
+        deleteChild(child) {
+          this.deleteTarget = child;
+          this.showDeleteDialog = true;
+        },
+
+        async confirmDelete() {
+          if (!this.deleteTarget) return;
+          this.loading = true;
+          try {
+            await fetch(`/admin/api/child/${this.deleteTarget.id}`, { method: 'DELETE' });
+            this.showDeleteDialog = false;
+            this.deleteTarget = null;
+            await this.loadStats();
+          } catch {}
+          this.loading = false;
+        },
+
+        async resetQuota(id) {
+          await fetch(`/admin/api/reset/${id}`);
+          await this.loadStats();
+        },
+
+        formatTime(secs) {
+          if (!secs || secs < 0) return '0:00';
+          const s = Math.floor(secs);
+          const h = Math.floor(s / 3600);
+          const m = Math.floor((s % 3600) / 60);
+          const sec = s % 60;
+          if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+          return `${m}:${String(sec).padStart(2, '0')}`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>

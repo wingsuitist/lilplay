@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env server/main.ts",
+    "test": "deno test --allow-net --allow-read --allow-write --allow-env tests/store.test.ts tests/meta.test.ts tests/auth.test.ts tests/stream.test.ts",
+    "test:api": "deno test --allow-net --allow-read --allow-write --allow-env --allow-run tests/api.test.ts",
+    "test:all": "deno test --allow-net --allow-read --allow-write --allow-env --allow-run tests/store.test.ts tests/meta.test.ts tests/auth.test.ts tests/stream.test.ts tests/api.test.ts",
+    "test:e2e": "npx playwright test"
+  },
+  "imports": {
+    "jsr:@std/assert": "jsr:@std/assert@^1.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Runtime data (mounted from outside, contains real PINs/secrets)
+data/
+data.json
+*.tmp
+
+# Node / Playwright
+node_modules/
+playwright-report/
+test-results/
+
+# Runtime-generated test copy
+fixtures/data.api-test.json
+
+# Env files (precautionary)
+.env
+.env.*

@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>lil-play app icon</title>
+  <defs>
+    <linearGradient id="bg" x1="64" y1="56" x2="448" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#135C6C"/>
+      <stop offset="1" stop-color="#0B2E4F"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(166 134) rotate(55) scale(252)">
+      <stop stop-color="#6FD4E3" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#6FD4E3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#glow)"/>
+
+  <circle cx="190" cy="174" r="100" fill="#F5EBD8"/>
+  <circle cx="238" cy="146" r="92" fill="#135C6C"/>
+
+  <circle cx="320" cy="114" r="10" fill="#F5EBD8" fill-opacity="0.88"/>
+  <circle cx="356" cy="154" r="7" fill="#F5EBD8" fill-opacity="0.72"/>
+  <circle cx="138" cy="318" r="8" fill="#F5EBD8" fill-opacity="0.58"/>
+
+  <rect x="288" y="132" width="34" height="190" rx="17" fill="#F29B38"/>
+  <path d="M322 140C360 145 388 158 408 176C417 184 421 196 421 209C421 222 417 231 409 239C391 256 361 264 322 264V140Z" fill="#F29B38"/>
+  <circle cx="266" cy="334" r="66" fill="#F29B38"/>
+
+  <circle cx="266" cy="334" r="38" fill="#F5EBD8" fill-opacity="0.15"/>
+  <path d="M266 306V334L287 347" stroke="#F5EBD8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="266" cy="334" r="9" fill="#F5EBD8"/>
+</svg>

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="lil-play" />
+  <meta name="theme-color" content="#135c6c" />
+  <title>lil-play</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <style>
+    /* ── Layout ───────────────────────────────────────── */
+    :root { --spacing: 0.75rem; }
+    body {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+      min-height: 100dvh;
+    }
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── PIN pad ──────────────────────────────────────── */
+    .pin-display {
+      font-size: 2rem; letter-spacing: 0.5rem;
+      text-align: center; min-height: 2.5rem; margin-bottom: 1rem;
+    }
+    .pin-dot {
+      display: inline-block; width: 0.8rem; height: 0.8rem;
+      border-radius: 50%; background: var(--pico-primary); margin: 0 0.2rem;
+      transition: background 0.1s;
+    }
+    .pin-dot.empty { background: var(--pico-muted-border-color); }
+    .keypad {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem; max-width: 280px; margin: 0 auto;
+    }
+    .keypad button {
+      aspect-ratio: 1; font-size: 1.5rem; font-weight: 600;
+      border-radius: 50%; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Quota bar ────────────────────────────────────── */
+    .quota-bar {
+      height: 8px; border-radius: 4px;
+      background: var(--pico-muted-border-color); overflow: hidden; margin: 0.4rem 0;
+    }
+    .quota-fill {
+      height: 100%; border-radius: 4px; background: var(--pico-primary);
+      transition: width 1s linear;
+    }
+    .quota-fill.low  { background: #e67e22; }
+    .quota-fill.empty { background: #e74c3c; }
+    .remaining-big  { text-align: center; font-size: 2rem; font-weight: 700; color: var(--pico-primary); }
+    .remaining-label { text-align: center; color: var(--pico-muted-color); font-size: 0.8rem; margin-top: -0.25rem; margin-bottom: 0.4rem; }
+
+    /* ── Breadcrumb ───────────────────────────────────── */
+    .breadcrumb {
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: 0.2rem; font-size: 0.85rem; margin-bottom: 0.4rem; overflow-x: auto;
+    }
+    .breadcrumb-btn {
+      background: none; border: none; padding: 0.1rem 0.25rem; cursor: pointer;
+      color: var(--pico-primary); text-decoration: underline; font-size: 0.85rem;
+      border-radius: 4px;
+    }
+    .breadcrumb-btn:hover { opacity: 0.7; }
+    .breadcrumb-sep { color: var(--pico-muted-color); user-select: none; }
+
+    /* ── Entry list ───────────────────────────────────── */
+    .entry-list {
+      list-style: none; padding: 0; margin: 0;
+      max-height: 38vh; overflow-y: auto; border-radius: 6px;
+    }
+    .entry-list li {
+      padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--pico-muted-border-color);
+      cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+      border-radius: 4px; transition: background 0.1s;
+    }
+    .entry-list li:last-child { border-bottom: none; }
+    .entry-list li:hover  { background: var(--pico-primary-background); }
+    .entry-list li.active { background: var(--pico-primary-background); font-weight: 700; }
+    .entry-icon  { flex-shrink: 0; font-size: 1rem; width: 1.4rem; text-align: center; }
+    .entry-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
+    .entry-meta  { color: var(--pico-muted-color); font-size: 0.78rem; flex-shrink: 0; }
+
+    /* ── Folder action bar ────────────────────────────── */
+    .folder-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.35rem;
+    }
+    .folder-bar small { color: var(--pico-muted-color); font-size: 0.8rem; }
+    .play-folder-btn {
+      font-size: 0.82rem; padding: 0.25rem 0.7rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+
+    /* ── Playback controls ────────────────────────────── */
+    .now-playing {
+      font-size: 0.82rem; color: var(--pico-muted-color);
+      text-align: center; margin: 0.2rem 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .controls {
+      display: flex; justify-content: center; align-items: center;
+      gap: 1rem; margin: 0.5rem 0;
+    }
+    .ctrl-btn {
+      border-radius: 50%; width: 3.2rem; height: 3.2rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; padding: 0;
+    }
+    .play-btn { width: 4.2rem !important; height: 4.2rem !important; font-size: 1.7rem !important; }
+    .progress-wrap { margin: 0.3rem 0; cursor: pointer; user-select: none; }
+    .progress-bar {
+      height: 6px; border-radius: 3px; background: var(--pico-muted-border-color);
+    }
+    .progress-fill { height: 100%; border-radius: 3px; background: var(--pico-primary); pointer-events: none; }
+    .time-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.15rem; }
+
+    /* ── Time's Up screen ─────────────────────────────── */
+    .timesup-screen {
+      min-height: 100dvh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 2rem;
+      background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
+      color: #fff; position: fixed; inset: 0; z-index: 100;
+    }
+    .timesup-screen h1, .timesup-screen h2, .timesup-screen p { color: #fff; }
+    .stars {
+      position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    }
+    .star {
+      position: absolute; width: 2px; height: 2px; background: white;
+      border-radius: 50%; animation: twinkle var(--d, 3s) ease-in-out infinite;
+      animation-delay: var(--delay, 0s); opacity: var(--op, 0.7);
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: var(--op, 0.7); transform: scale(1); }
+      50%       { opacity: 0.1;           transform: scale(0.5); }
+    }
+    .moon { font-size: 5rem; animation: float 4s ease-in-out infinite; margin-bottom: 0.5rem; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+    .timesup-title { font-size: 1.8rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+    .timesup-sub   { font-size: 1rem; opacity: 0.8; margin-bottom: 1.5rem; }
+    .countdown-box {
+      background: rgba(255,255,255,0.12); border-radius: 16px;
+      padding: 1rem 1.5rem; margin: 0.5rem 0 1.5rem;
+      backdrop-filter: blur(6px);
+    }
+    .countdown-label { font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.1em; }
+    .countdown-time  { font-size: 2.8rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+    .timesup-signout {
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+      color: white; border-radius: 8px; padding: 0.5rem 1.2rem; cursor: pointer;
+      font-size: 0.9rem; transition: background 0.2s;
+    }
+    .timesup-signout:hover { background: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+  <main class="container" x-data="app()" x-init="init()">
+
+    <!-- ── PIN Screen ─────────────────────────────────── -->
+    <div class="screen" :class="{ active: screen === 'pin' }">
+      <hgroup style="text-align:center; margin-top: 2rem;">
+        <h1>🎵</h1>
+        <p>Enter your PIN</p>
+      </hgroup>
+
+      <div class="pin-display" aria-label="PIN entry">
+        <template x-for="i in maxPin" :key="i">
+          <span class="pin-dot" :class="{ empty: i > pin.length }"></span>
+        </template>
+      </div>
+
+      <p x-show="pinError" role="alert" style="color:var(--pico-del-color);text-align:center;" x-text="pinError"></p>
+
+      <div class="keypad" role="group" aria-label="PIN keypad">
+        <template x-for="d in [1,2,3,4,5,6,7,8,9]" :key="d">
+          <button @click="appendPin(String(d))" x-text="d" :disabled="pinLoading"></button>
+        </template>
+        <button @click="clearPin()" aria-label="Delete digit">⌫</button>
+        <button @click="appendPin('0')" :disabled="pinLoading">0</button>
+        <button @click="submitPin()" aria-label="Confirm PIN"
+                :disabled="pinLoading || pin.length < 4"
+                style="background:var(--pico-primary);border-color:var(--pico-primary);color:#fff;">✓</button>
+      </div>
+      <p style="text-align:center;margin-top:1rem;" x-show="pinLoading" aria-busy="true">Checking…</p>
+    </div>
+
+    <!-- ── Player Screen ──────────────────────────────── -->
+    <div class="screen" :class="{ active: screen === 'player' }">
+
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+        <span style="font-weight:600;" x-text="childName"></span>
+        <button class="outline" style="padding:0.2rem 0.6rem;font-size:0.78rem;" @click="logout()">Sign out</button>
+      </div>
+
+      <!-- Quota -->
+      <div>
+        <div class="remaining-big" x-text="formatDuration(quota.remaining)"></div>
+        <div class="remaining-label">remaining today</div>
+        <div class="quota-bar">
+          <div class="quota-fill"
+               :class="{ low: quota.remaining < 600, empty: quota.remaining <= 0 }"
+               :style="`width:${quota.limit > 0 ? Math.max(0, quota.remaining / quota.limit * 100) : 0}%`"></div>
+        </div>
+      </div>
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb" role="navigation" aria-label="Folder navigation">
+        <button class="breadcrumb-btn" @click="navigateTo('')">🏠</button>
+        <template x-for="(seg, i) in pathSegments" :key="i">
+          <>
+            <span class="breadcrumb-sep">›</span>
+            <button class="breadcrumb-btn"
+                    @click="navigateTo(pathSegments.slice(0, i + 1).join('/'))"
+                    x-text="seg"></button>
+          </>
+        </template>
+      </div>
+
+      <!-- Folder action bar -->
+      <div class="folder-bar">
+        <small x-show="fileEntries.length > 0">
+          <span x-text="fileEntries.length"></span> track<span x-show="fileEntries.length !== 1">s</span>
+        </small>
+        <small x-show="fileEntries.length === 0"></small>
+        <button class="outline play-folder-btn" x-show="fileEntries.length > 0" @click="playFolder()">
+          ▶ Play folder
+        </button>
+      </div>
+
+      <!-- Entry list -->
+      <ul class="entry-list" role="listbox" aria-label="Files and folders">
+        <template x-for="entry in entries" :key="entry.type + ':' + entry.name">
+          <li role="option"
+              :aria-selected="entry.type === 'file' && currentRelPath === entry.relative_path"
+              @click="onEntryClick(entry)"
+              :class="{ active: entry.type === 'file' && currentRelPath === entry.relative_path }">
+            <span class="entry-icon" x-text="entry.type === 'folder' ? '📁' : (currentRelPath === entry.relative_path && playing ? '▶' : '🎵')"></span>
+            <span class="entry-name" x-text="entry.name"></span>
+            <span class="entry-meta" x-show="entry.type === 'file'" x-text="formatDuration(entry.duration_seconds)"></span>
+          </li>
+        </template>
+        <li x-show="entries.length === 0"
+            style="color:var(--pico-muted-color);cursor:default;justify-content:center;padding:1rem;">
+          No music here
+        </li>
+      </ul>
+
+      <!-- Now playing -->
+      <p class="now-playing" x-show="currentRelPath" x-text="'♪ ' + currentTitle"></p>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button class="ctrl-btn secondary outline"
+                @click="prev()" :disabled="!hasPrev" aria-label="Previous track">⏮</button>
+        <button class="ctrl-btn play-btn"
+                @click="togglePlay()"
+                :aria-label="playing ? 'Pause' : 'Play'"
+                x-text="playing ? '⏸' : '▶'"></button>
+        <button class="ctrl-btn secondary outline"
+                @click="next()" :disabled="!hasNext" aria-label="Next track">⏭</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" @click="seek($event)" x-show="currentRelPath">
+        <div class="progress-bar">
+          <div class="progress-fill"
+               :style="`width:${currentDuration > 0 ? Math.min(100, currentTime / currentDuration * 100) : 0}%`"></div>
+        </div>
+        <div class="time-row">
+          <span x-text="formatDuration(currentTime)"></span>
+          <span x-text="formatDuration(currentDuration)"></span>
+        </div>
+      </div>
+
+      <p x-show="errorMsg" role="alert"
+         style="color:var(--pico-del-color);text-align:center;font-size:0.85rem;margin-top:0.5rem;"
+         x-text="errorMsg"></p>
+    </div>
+
+    <!-- ── Time's Up Screen ────────────────────────────── -->
+    <div x-show="screen === 'timesup'" class="timesup-screen" x-cloak>
+      <!-- Animated stars -->
+      <div class="stars" aria-hidden="true">
+        <template x-for="s in stars" :key="s.id">
+          <div class="star"
+               :style="`left:${s.x}%;top:${s.y}%;--d:${s.d}s;--delay:${s.delay}s;--op:${s.op};width:${s.size}px;height:${s.size}px`"></div>
+        </template>
+      </div>
+
+      <div class="moon" aria-hidden="true">🌙</div>
+      <div class="timesup-title">Time's up for today!</div>
+      <div class="timesup-sub">Your music resets at midnight.</div>
+
+      <div class="countdown-box">
+        <div class="countdown-label">Resets in</div>
+        <div class="countdown-time" x-text="countdown" aria-live="polite"></div>
+      </div>
+
+      <p style="opacity:0.7;font-size:0.9rem;">Sweet dreams 💤</p>
+      <button class="timesup-signout" @click="logout()">Sign out</button>
+    </div>
+
+    <!-- Hidden audio -->
+    <audio x-ref="audio" preload="none" style="display:none"
+           @play="onAudioPlay()"
+           @pause="onAudioPause()"
+           @ended="onAudioEnded()"
+           @timeupdate="onTimeUpdate()"
+           @error="onAudioError()">
+    </audio>
+
+  </main>
+
+  <script>
+    function app() {
+      return {
+        // ── State ─────────────────────────────────────
+        screen: 'pin',
+
+        // PIN
+        pin: '', maxPin: 6, pinError: '', pinLoading: false,
+
+        // Identity
+        childName: '',
+
+        // Directory navigation
+        currentPath: '',   // e.g. "" or "Hoerbucher/Folge1"
+        entries: [],       // DirEntry[] — folders first, then files
+
+        // Playback
+        currentRelPath: '',   // relative path of loaded track
+        currentTitle: '',
+        currentDuration: 0,
+        currentTime: 0,
+        playing: false,
+        pendingSeek: null,    // seconds to seek once audio is ready
+
+        // Quota
+        quota: { used: 0, limit: 3600, remaining: 3600, reset_at: '', reset_at_ms: 0 },
+        errorMsg: '',
+
+        // Time's-up countdown
+        countdown: '–:––:––',
+        countdownInterval: null,
+
+        // Polling
+        quotaInterval: null,
+        positionSaveInterval: null,
+
+        // Stars for background
+        stars: [],
+
+        // ── Computed ──────────────────────────────────
+        get pathSegments() {
+          return this.currentPath ? this.currentPath.split('/') : [];
+        },
+        get fileEntries() {
+          return this.entries.filter(e => e.type === 'file');
+        },
+        get currentFileIdx() {
+          return this.fileEntries.findIndex(e => e.relative_path === this.currentRelPath);
+        },
+        get hasPrev() { return this.currentFileIdx > 0; },
+        get hasNext()  { return this.currentFileIdx < this.fileEntries.length - 1; },
+
+        // ── Init ──────────────────────────────────────
+        async init() {
+          this.generateStars();
+          try {
+            const res = await fetch('/api/session');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.authenticated) {
+                this.childName = data.name;
+                this.quota = data.quota;
+                if (this.quota.remaining <= 0) {
+                  this.showTimesUp();
+                  return;
+                }
+                // Restore saved playback position
+                const saved = data.playback;
+                const folder = saved?.folder ?? '';
+                await this.loadDir(folder);
+                if (saved?.file) {
+                  const entry = this.fileEntries.find(e => e.relative_path === saved.file);
+                  if (entry) {
+                    this.loadFileEntry(entry, false); // load but don't play
+                    this.pendingSeek = saved.position ?? 0;
+                  }
+                }
+                this.screen = 'player';
+                this.startQuotaPolling();
+                this.startPositionSaving();
+                return;
+              }
+            }
+          } catch {}
+          this.screen = 'pin';
+        },
+
+        generateStars() {
+          this.stars = Array.from({ length: 60 }, (_, i) => ({
+            id: i,
+            x: Math.random() * 100,
+            y: Math.random() * 100,
+            d: (2 + Math.random() * 4).toFixed(1),
+            delay: (Math.random() * 4).toFixed(1),
+            op: (0.4 + Math.random() * 0.6).toFixed(2),
+            size: Math.random() < 0.8 ? 2 : 3,
+          }));
+        },
+
+        // ── PIN ───────────────────────────────────────
+        appendPin(d) {
+          if (this.pin.length >= this.maxPin) return;
+          this.pin += d;
+          this.pinError = '';
+        },
+        clearPin() {
+          if (this.pin.length > 0) this.pin = this.pin.slice(0, -1);
+        },
+        async submitPin() {
+          if (this.pin.length < 4 || this.pinLoading) return;
+          this.pinLoading = true;
+          this.pinError = '';
+          try {
+            const res = await fetch('/api/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pin: this.pin }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+              this.childName = data.name;
+              this.pin = '';
+              await this.loadQuota();
+              if (this.quota.remaining <= 0) { this.showTimesUp(); return; }
+              await this.loadDir('');
+              this.screen = 'player';
+              this.startQuotaPolling();
+              this.startPositionSaving();
+            } else {
+              this.pinError = data.error || 'Wrong PIN';
+              this.pin = '';
+            }
+          } catch {
+            this.pinError = 'Connection error';
+          }
+          this.pinLoading = false;
+        },
+
+        // ── Directory navigation ───────────────────────
+        async loadDir(relPath) {
+          this.currentPath = relPath;
+          try {
+            const qs = relPath ? `?path=${encodeURIComponent(relPath)}` : '';
+            const res = await fetch(`/api/files${qs}`);
+            if (res.ok) {
+              const data = await res.json();
+              this.entries = data.entries || [];
+            }
+          } catch {}
+        },
+
+        async navigateTo(relPath) {
+          await this.loadDir(relPath);
+        },
+
+        onEntryClick(entry) {
+          if (entry.type === 'folder') {
+            const newPath = this.currentPath
+              ? `${this.currentPath}/${entry.name}`
+              : entry.name;
+            this.loadDir(newPath);
+          } else {
+            this.loadFileEntry(entry, true);
+          }
+        },
+
+        // ── Playback ──────────────────────────────────
+        loadFileEntry(entry, autoPlay = true) {
+          this.$refs.audio.pause();
+          this.currentRelPath = entry.relative_path;
+          this.currentTitle  = entry.title || entry.name;
+          this.currentDuration = entry.duration_seconds || 0;
+          this.currentTime   = 0;
+          this.errorMsg      = '';
+          const siteToken = new URLSearchParams(location.search).get('s') || '';
+          // Build URL — keep slashes un-encoded so server routing works
+          const encoded = entry.relative_path.split('/').map(encodeURIComponent).join('/');
+          const url = `/stream/${encoded}${siteToken ? '?s=' + siteToken : ''}`;
+          this.$refs.audio.src = url;
+          this.$refs.audio.load();
+          if (autoPlay) this.$refs.audio.play().catch(() => {});
+        },
+
+        playFolder() {
+          const first = this.fileEntries[0];
+          if (first) this.loadFileEntry(first, true);
+        },
+
+        togglePlay() {
+          if (!this.currentRelPath) {
+            const first = this.fileEntries[0];
+            if (first) this.loadFileEntry(first, true);
+            return;
+          }
+          if (this.playing) {
+            this.$refs.audio.pause();
+          } else {
+            this.$refs.audio.play().catch(() => {});
+          }
+        },
+
+        prev() {
+          const idx = this.currentFileIdx;
+          if (idx > 0) this.loadFileEntry(this.fileEntries[idx - 1], true);
+        },
+
+        next() {
+          const idx = this.currentFileIdx;
+          if (idx < this.fileEntries.length - 1)
+            this.loadFileEntry(this.fileEntries[idx + 1], true);
+        },
+
+        seek(event) {
+          const bar = event.currentTarget.querySelector('.progress-bar');
+          if (!bar || !this.currentDuration) return;
+          const rect  = bar.getBoundingClientRect();
+          const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+          this.$refs.audio.currentTime = ratio * this.currentDuration;
+        },
+
+        // ── Audio event handlers ───────────────────────
+        onAudioPlay() {
+          this.playing = true;
+          this.errorMsg = '';
+          // Apply pending seek (position restore after reload)
+          if (this.pendingSeek !== null) {
+            this.$refs.audio.currentTime = this.pendingSeek;
+            this.pendingSeek = null;
+          }
+          this.notifyEvent('play');
+        },
+
+        onAudioPause() {
+          this.playing = false;
+          this.notifyEvent('pause');
+          this.savePosition();
+        },
+
+        onAudioEnded() {
+          this.playing = false;
+          this.next();
+        },
+
+        onTimeUpdate() {
+          this.currentTime = this.$refs.audio.currentTime;
+        },
+
+        onAudioError() {
+          this.playing = false;
+          this.loadQuota().then(() => {
+            if (this.quota.remaining <= 0) {
+              this.showTimesUp();
+            } else {
+              this.errorMsg = 'Playback error — tap to retry.';
+            }
+          });
+        },
+
+        notifyEvent(type) {
+          fetch('/api/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, file: this.currentRelPath, position_seconds: this.currentTime }),
+          }).catch(() => {});
+        },
+
+        // ── Position persistence ───────────────────────
+        savePosition() {
+          if (!this.currentRelPath) return;
+          fetch('/api/playback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              file: this.currentRelPath,
+              position_seconds: Math.floor(this.currentTime),
+              folder: this.currentPath,
+            }),
+          }).catch(() => {});
+        },
+
+        startPositionSaving() {
+          this.positionSaveInterval = setInterval(() => {
+            if (this.playing) this.savePosition();
+          }, 5000);
+        },
+
+        // ── Quota polling ──────────────────────────────
+        async loadQuota() {
+          try {
+            const res = await fetch('/api/quota');
+            if (res.ok) this.quota = await res.json();
+          } catch {}
+        },
+
+        startQuotaPolling() {
+          this.quotaInterval = setInterval(async () => {
+            await this.loadQuota();
+            if (this.quota.remaining <= 0 && this.screen === 'player') {
+              this.$refs.audio.pause();
+              this.playing = false;
+              this.showTimesUp();
+            }
+          }, 5000);
+        },
+
+        // ── Time's up ─────────────────────────────────
+        showTimesUp() {
+          this.screen = 'timesup';
+          this.updateCountdown();
+          this.countdownInterval = setInterval(() => this.updateCountdown(), 1000);
+        },
+
+        updateCountdown() {
+          const resetMs = this.quota.reset_at_ms;
+          if (!resetMs) { this.countdown = '–:––:––'; return; }
+          const diff = Math.max(0, resetMs - Date.now());
+          const h = Math.floor(diff / 3_600_000);
+          const m = Math.floor((diff % 3_600_000) / 60_000);
+          const s = Math.floor((diff % 60_000) / 1000);
+          this.countdown = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        },
+
+        // ── Logout ────────────────────────────────────
+        async logout() {
+          clearInterval(this.quotaInterval);
+          clearInterval(this.positionSaveInterval);
+          clearInterval(this.countdownInterval);
+          this.$refs.audio.pause();
+          this.playing = false;
+          this.savePosition();
+          await fetch('/api/logout', { method: 'POST' });
+          // Reset state
+          this.screen = 'pin';
+          this.pin = '';
+          this.entries = [];
+          this.currentRelPath = '';
+          this.currentPath = '';
+          this.currentTitle = '';
+          this.currentTime = 0;
+          this.currentDuration = 0;
+        },
+
+        // ── Helpers ───────────────────────────────────
+        formatDuration(secs) {
+          if (secs == null || secs < 0) return '0:00';
+          const s = Math.floor(secs);
+          const h = Math.floor(s / 3600);
+          const m = Math.floor((s % 3600) / 60);
+          const sec = s % 60;
+          if (h > 0)
+            return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+          return `${m}:${String(sec).padStart(2,'0')}`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>
