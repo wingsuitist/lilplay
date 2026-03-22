@@ -70,7 +70,7 @@ Deno.test({
     const res = await fetch(`${BASE}/?s=${SITE_TOKEN}`);
     assertEquals(res.status, 200);
     const text = await res.text();
-    assertStringIncludes(text, "Music Player");
+    assertStringIncludes(text, "lil-play");
   },
   sanitizeResources: false,
   sanitizeOps: false,
