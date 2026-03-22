@@ -60,3 +60,12 @@ test('sign out returns to PIN screen', async ({ page }) => {
   await page.click('button:has-text("Sign out")');
   await expect(page.locator('input[type="password"]')).toBeVisible();
 });
+
+test('admin link on PIN screen links to admin with site token', async ({ page }) => {
+  await page.goto(`/?s=${SITE_TOKEN}`);
+  const adminLink = page.locator('a:has-text("Admin")');
+  await expect(adminLink).toBeVisible();
+  const href = await adminLink.getAttribute('href');
+  expect(href).toContain('/admin');
+  expect(href).toContain(SITE_TOKEN);
+});
