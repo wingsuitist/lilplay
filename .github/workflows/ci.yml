@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Unit + Integration Tests
+    runs-on: ubuntu-latest
+    container:
+      image: denoland/deno:2.3.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Deno dependencies
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/deno
+          key: deno-${{ hashFiles('deno.lock') }}
+          restore-keys: deno-
+
+      - name: Run tests
+        run: deno task test:all
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: '2.3.3'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Cache Deno dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ hashFiles('deno.lock') }}
+          restore-keys: deno-
+
+      - name: Run E2E tests
+        run: deno task test:e2e
+
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, test-e2e]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/wingsuitist/lilplay
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
