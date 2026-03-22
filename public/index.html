@@ -25,25 +25,9 @@
     .screen { display: none; }
     .screen.active { display: block; }
 
-    /* ── PIN pad ──────────────────────────────────────── */
-    .pin-display {
-      font-size: 2rem; letter-spacing: 0.5rem;
-      text-align: center; min-height: 2.5rem; margin-bottom: 1rem;
-    }
-    .pin-dot {
-      display: inline-block; width: 0.8rem; height: 0.8rem;
-      border-radius: 50%; background: var(--pico-primary); margin: 0 0.2rem;
-      transition: background 0.1s;
-    }
-    .pin-dot.empty { background: var(--pico-muted-border-color); }
-    .keypad {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 0.5rem; max-width: 280px; margin: 0 auto;
-    }
-    .keypad button {
-      aspect-ratio: 1; font-size: 1.5rem; font-weight: 600;
-      border-radius: 50%; padding: 0;
-      display: flex; align-items: center; justify-content: center;
+    /* ── PIN input ────────────────────────────────────── */
+    .pin-form {
+      max-width: 280px; margin: 0 auto;
     }
 
     /* ── Quota bar ────────────────────────────────────── */
@@ -177,25 +161,22 @@
         <p>Enter your PIN</p>
       </hgroup>
 
-      <div class="pin-display" aria-label="PIN entry">
-        <template x-for="i in maxPin" :key="i">
-          <span class="pin-dot" :class="{ empty: i > pin.length }"></span>
-        </template>
-      </div>
-
-      <p x-show="pinError" role="alert" style="color:var(--pico-del-color);text-align:center;" x-text="pinError"></p>
-
-      <div class="keypad" role="group" aria-label="PIN keypad">
-        <template x-for="d in [1,2,3,4,5,6,7,8,9]" :key="d">
-          <button @click="appendPin(String(d))" x-text="d" :disabled="pinLoading"></button>
-        </template>
-        <button @click="clearPin()" aria-label="Delete digit">⌫</button>
-        <button @click="appendPin('0')" :disabled="pinLoading">0</button>
-        <button @click="submitPin()" aria-label="Confirm PIN"
+      <div class="pin-form">
+        <input type="password" inputmode="numeric" pattern="[0-9]*"
+               autocomplete="current-password"
+               placeholder="PIN"
+               x-model="pin"
+               @input="pinError = ''"
+               @keydown.enter="submitPin()"
+               :disabled="pinLoading"
+               style="text-align:center;font-size:1.5rem;letter-spacing:0.5rem;"
+               x-ref="pinInput" />
+        <p x-show="pinError" role="alert" style="color:var(--pico-del-color);text-align:center;" x-text="pinError"></p>
+        <button @click="submitPin()"
                 :disabled="pinLoading || pin.length < 4"
-                style="background:var(--pico-primary);border-color:var(--pico-primary);color:#fff;">✓</button>
+                style="width:100%;"
+                x-text="pinLoading ? 'Checking…' : 'Enter'"></button>
       </div>
-      <p style="text-align:center;margin-top:1rem;" x-show="pinLoading" aria-busy="true">Checking…</p>
     </div>
 
     <!-- ── Player Screen ──────────────────────────────── -->
@@ -410,7 +391,7 @@
               }
             }
           } catch {}
-          this.screen = 'pin';
+          this.screen = 'pin'; this.$nextTick(() => this.$refs.pinInput?.focus());
         },
 
         generateStars() {
@@ -426,14 +407,6 @@
         },
 
         // ── PIN ───────────────────────────────────────
-        appendPin(d) {
-          if (this.pin.length >= this.maxPin) return;
-          this.pin += d;
-          this.pinError = '';
-        },
-        clearPin() {
-          if (this.pin.length > 0) this.pin = this.pin.slice(0, -1);
-        },
         async submitPin() {
           if (this.pin.length < 4 || this.pinLoading) return;
           this.pinLoading = true;
@@ -658,7 +631,7 @@
           this.savePosition();
           await fetch('/api/logout', { method: 'POST' });
           // Reset state
-          this.screen = 'pin';
+          this.screen = 'pin'; this.$nextTick(() => this.$refs.pinInput?.focus());
           this.pin = '';
           this.entries = [];
           this.currentRelPath = '';
