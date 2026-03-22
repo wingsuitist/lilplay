@@ -77,6 +77,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "GET /manifest.json → contains real site token in start_url",
+  async fn() {
+    const res = await fetch(`${BASE}/manifest.json`);
+    assertEquals(res.status, 200);
+    const manifest = await res.json();
+    assertStringIncludes(manifest.start_url, SITE_TOKEN);
+  },
+  sanitizeResources: false,
+  sanitizeOps: false,
+});
+
+Deno.test({
   name: "GET /api/session without cookie → 401",
   async fn() {
     const res = await fetch(`${BASE}/api/session`);

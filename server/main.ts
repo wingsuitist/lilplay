@@ -85,8 +85,16 @@ async function handler(req: Request): Promise<Response> {
     return serveStatic("admin.html");
   }
 
+  // ── Manifest: inject real site token into start_url ───────
+  if (method === "GET" && path === "/manifest.json") {
+    const raw = await Deno.readTextFile(`${PUBLIC_DIR}/manifest.json`);
+    const siteToken = getData().site_token;
+    const patched = raw.replace("REPLACE_WITH_SITE_TOKEN", siteToken);
+    return new Response(patched, { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── Static files ───────────────────────────────────────────
-  if (method === "GET" && (path.startsWith("/manifest") || path.startsWith("/sw.js") || path.startsWith("/icons"))) {
+  if (method === "GET" && (path.startsWith("/sw.js") || path.startsWith("/icons"))) {
     return serveStatic(path.slice(1));
   }
 
